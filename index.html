@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Gemeinsame Urlaubswoche</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one column; verdict first (best week), then the year as a heat calendar, then everyone's availability bars, then the entry form. */
+:root{
+  --bg:#F2F6F5; --surface:#FFFFFF; --ink:#13252C; --muted:#5A6D72; --line:#D5E0DE;
+  --sea:#0B7A75; --sea-ink:#FFFFFF; --sun:#E08A1E; --sun-soft:#FBE7CB; --cell:#E5EDEB; --danger:#B4432F;
+  --display:"Unbounded", "Arial Black", system-ui, sans-serif;
+  --body:"Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E181B; --surface:#152328; --ink:#E3EEEC; --muted:#93A7AB; --line:#27393E;
+  --sea:#3DBDB2; --sea-ink:#06201E; --sun:#F2AE55; --sun-soft:#3A2A14; --cell:#1C2C31; --danger:#E77B66; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0E181B; --surface:#152328; --ink:#E3EEEC; --muted:#93A7AB; --line:#27393E;
+  --sea:#3DBDB2; --sea-ink:#06201E; --sun:#F2AE55; --sun-soft:#3A2A14; --cell:#1C2C31; --danger:#E77B66; color-scheme:dark;}
+
+*{box-sizing:border-box}
+body{margin:0}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+h1,h2,h3{text-wrap:balance;margin:0}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(1.5rem,4vw,2.2rem);letter-spacing:-.01em;line-height:1.1}
+h2{font-family:var(--display);font-weight:500;font-size:1.05rem;letter-spacing:.01em}
+.eyebrow{font-size:.72rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:600}
+.muted{color:var(--muted)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--sea);outline-offset:2px}
+
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px 24px}
+header.top .intro{display:flex;flex-direction:column;gap:6px;min-width:0;max-width:560px}
+.controls{display:flex;flex-wrap:wrap;gap:10px}
+.ctl{display:flex;flex-direction:column;gap:3px}
+.ctl label{font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:600}
+select,input[type=text],input[type=date]{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 10px;min-height:38px}
+input[type=date]{font-family:var(--mono);font-size:.88rem}
+
+.status{border:1px dashed var(--line);border-radius:10px;padding:10px 14px;color:var(--muted);font-size:.9rem}
+.status[data-kind="demo"]{border-style:solid;border-color:var(--sun);background:var(--sun-soft);color:var(--ink)}
+
+/* Verdict */
+.verdict{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px clamp(16px,3vw,28px);display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:24px}
+@media (max-width:760px){.verdict{grid-template-columns:1fr}}
+.verdict .when{font-family:var(--display);font-weight:700;font-size:clamp(1.35rem,3.6vw,2rem);line-height:1.15;letter-spacing:-.01em}
+.verdict .kw{display:inline-block;font-family:var(--mono);font-size:.8rem;background:var(--sun);color:#1b1206;border-radius:6px;padding:2px 8px;margin-top:8px;font-weight:600}
+.score{display:flex;align-items:baseline;gap:8px;margin-top:14px}
+.score b{font-family:var(--display);font-size:2.6rem;color:var(--sea);line-height:1}
+.meter{height:8px;border-radius:99px;background:var(--cell);overflow:hidden;margin-top:10px}
+.meter i{display:block;height:100%;background:var(--sea);border-radius:99px}
+.who{display:flex;flex-direction:column;gap:12px;min-width:0}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border-radius:99px;padding:3px 10px;font-size:.85rem;border:1px solid var(--line);background:var(--bg)}
+.chip.yes{background:var(--sea);color:var(--sea-ink);border-color:var(--sea)}
+.chip.near{border-color:var(--sun);background:var(--sun-soft)}
+.chip.no{color:var(--muted)}
+.chip small{opacity:.8}
+
+.alts{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.alt{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;text-align:left;cursor:pointer}
+.alt:hover{border-color:var(--sea)}
+.alt[aria-pressed="true"]{border-color:var(--sun);box-shadow:0 0 0 1px var(--sun)}
+.alt .d{font-weight:600}
+.alt .n{font-family:var(--mono);font-size:.82rem;color:var(--muted)}
+.alt .rank{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+
+section{display:flex;flex-direction:column;gap:14px}
+.sechead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px}
+
+/* Heat calendar */
+.months{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:18px 16px}
+.month h3{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+.grid7{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.grid7 .dh{font-size:.62rem;color:var(--muted);text-align:center;font-family:var(--mono)}
+.day{aspect-ratio:1;max-width:100%;border:0;border-radius:4px;padding:0;font-family:var(--mono);font-size:.62rem;cursor:pointer;
+  background:color-mix(in oklab,var(--sea) var(--h,0%),var(--cell));color:var(--ink);position:relative}
+.day.hot{color:var(--sea-ink)}
+.day.inwin{box-shadow:inset 0 0 0 2px var(--sun)}
+.day.sel{outline:2px solid var(--ink);outline-offset:1px}
+.legend{display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--muted);flex-wrap:wrap}
+.legend .ramp{display:flex;gap:2px}
+.legend .ramp i{width:16px;height:12px;border-radius:3px;display:block}
+.legend .win{width:16px;height:12px;border-radius:3px;box-shadow:inset 0 0 0 2px var(--sun);background:var(--cell)}
+.dayinfo{font-size:.9rem;min-height:1.5em}
+
+/* Timeline */
+.tl{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.tlrow{display:grid;grid-template-columns:minmax(80px,150px) minmax(0,1fr) auto;align-items:center;gap:10px}
+.tlname{font-weight:600;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.track{position:relative;height:18px;background:var(--cell);border-radius:5px;overflow:hidden}
+.track .bar{position:absolute;top:0;bottom:0;background:var(--sea);border-radius:3px;min-width:2px}
+.track .band{position:absolute;z-index:1;top:-2px;bottom:-2px;background:color-mix(in oklab,var(--sun) 30%,transparent);border-left:2px solid var(--sun);border-right:2px solid var(--sun)}
+.ticks{display:grid;grid-template-columns:repeat(12,1fr);font-family:var(--mono);font-size:.62rem;color:var(--muted)}
+.tlhead{grid-template-columns:minmax(80px,150px) minmax(0,1fr) auto}
+.icon-btn{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:3px 9px;font-size:.8rem;cursor:pointer}
+.icon-btn:hover{border-color:var(--sea)}
+.empty{padding:24px;text-align:center;color:var(--muted)}
+
+/* Form */
+.form{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px clamp(16px,3vw,26px);display:flex;flex-direction:column;gap:16px}
+.field{display:flex;flex-direction:column;gap:5px;max-width:360px}
+.field label,.rangeshead{font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.ranges{display:flex;flex-direction:column;gap:8px}
+.range{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.range span{color:var(--muted);font-size:.85rem}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{border-radius:9px;padding:9px 16px;font-weight:600;cursor:pointer;border:1px solid var(--line);background:var(--bg)}
+.btn.primary{background:var(--sea);color:var(--sea-ink);border-color:var(--sea)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--danger);border-color:color-mix(in oklab,var(--danger) 50%,var(--line))}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.msg{font-size:.9rem}
+.msg.err{color:var(--danger)}
+.msg.ok{color:var(--sea)}
+.hint{font-size:.85rem;color:var(--muted);max-width:65ch}
+@media (prefers-reduced-motion:no-preference){.meter i{transition:width .5s ease}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="intro">
+      <span class="eyebrow">Urlaubsplanung der Freundesgruppe</span>
+      <h1>Gemeinsame Urlaubswoche</h1>
+      <p class="muted" style="margin:0">Jede Person trägt ein, wann sie Urlaub nehmen könnte. Darunter steht automatisch der Zeitraum, in dem die meisten gleichzeitig können.</p>
+    </div>
+    <div class="controls">
+      <div class="ctl"><label for="year">Jahr</label><select id="year"></select></div>
+      <div class="ctl"><label for="len">Dauer</label>
+        <select id="len"><option value="5">5 Tage</option><option value="7" selected>1 Woche</option><option value="10">10 Tage</option><option value="14">2 Wochen</option></select></div>
+      <div class="ctl"><label for="dow">Start</label>
+        <select id="dow"><option value="any">beliebiger Tag</option><option value="6">Samstag</option><option value="5">Freitag</option><option value="1">Montag</option></select></div>
+    </div>
+  </header>
+
+  <div id="status" class="status" hidden></div>
+
+  <section aria-labelledby="h-form" id="formsec">
+    <div class="sechead"><h2 id="h-form">Zeiträume eintragen</h2>
+      <button class="btn ghost" id="newperson" type="button">+ Weitere Person eintragen</button></div>
+    <form id="form" class="form" novalidate>
+      <div class="field"><label for="name">Name</label><input type="text" id="name" maxlength="40" autocomplete="off" placeholder="z. B. Lena"></div>
+      <div class="ranges">
+        <div class="rangeshead">Hier könnte ich Urlaub nehmen</div>
+        <div id="ranges" class="ranges"></div>
+        <div><button type="button" class="btn ghost" id="addrange">+ Zeitraum hinzufügen</button></div>
+      </div>
+      <p class="hint">Trag alle Zeiträume ein, in denen Urlaub möglich wäre, gern großzügig. Je mehr Spielraum, desto besser die Treffer.</p>
+      <div class="actions">
+        <button type="submit" class="btn primary" id="save">Speichern</button>
+        <button type="button" class="btn danger" id="del" hidden>Eintrag löschen</button>
+        <span id="formmsg" class="msg" role="status"></span>
+      </div>
+    </form>
+  </section>
+
+  <section aria-labelledby="h-best">
+    <h2 id="h-best" class="eyebrow" style="font-family:var(--body);font-size:.72rem;letter-spacing:.12em">Bester Zeitraum</h2>
+    <div id="verdict"></div>
+    <div id="alts" class="alts"></div>
+  </section>
+
+  <section aria-labelledby="h-cal">
+    <div class="sechead">
+      <h2 id="h-cal">Jahreskalender</h2>
+      <div class="legend"><span>weniger frei</span><span class="ramp" id="ramp"></span><span>mehr frei</span><span class="win" aria-hidden="true"></span><span>gewählter Zeitraum</span></div>
+    </div>
+    <div id="months" class="months"></div>
+    <div id="dayinfo" class="dayinfo muted">Tipp: Auf einen Tag tippen, um zu sehen, wer dann frei ist.</div>
+  </section>
+
+  <section aria-labelledby="h-tl">
+    <div class="sechead"><h2 id="h-tl">Wer kann wann</h2><span class="muted mono" id="pcount"></span></div>
+    <div id="timeline" class="tl"></div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+// ===== Verbindung zur Datenbank (Supabase) =====
+const SUPABASE_URL = "https://iuduweddvyffzzpagwho.supabase.co";   // z. B. "https://abcdefgh.supabase.co"
+const SUPABASE_KEY = "sb_publishable_8c17lLANvJdKSBLn7HdWFg_zyjaspbP";   // "anon"- bzw. "publishable"-Schlüssel
+const TABLE = "urlaub";
+// ===============================================
+const DAY = 86400000;
+const MONTHS = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+const fmtLong = new Intl.DateTimeFormat("de-DE",{weekday:"short",day:"numeric",month:"long",timeZone:"UTC"});
+const fmtShort = new Intl.DateTimeFormat("de-DE",{day:"numeric",month:"short",timeZone:"UTC"});
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const toDay = s => { const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s||""); return m? Date.UTC(+m[1],+m[2]-1,+m[3])/DAY : NaN; };
+const isoOf = d => new Date(d*DAY).toISOString().slice(0,10);
+const dow = d => (d+4)%7; // 0 = Sonntag
+function isoWeek(d){ const t=new Date(d*DAY); const day=(t.getUTCDay()+6)%7; t.setUTCDate(t.getUTCDate()-day+3); const fy=t.getUTCFullYear(); const ft=new Date(Date.UTC(fy,0,4)); return 1+Math.round(((t-ft)/DAY-3+((ft.getUTCDay()+6)%7))/7); }
+
+const now = new Date();
+const defYear = now.getMonth()>=9 ? now.getFullYear()+1 : now.getFullYear();
+const S = { people:[], demo:false, year:defYear, len:7, dow:"any", picked:0, selDay:null,
+  online:false, err:false, myId:null, editingId:null, formRanges:[], delArm:false, dupArm:null, timer:null };
+
+// Year select
+for(let y=defYear-1;y<=defYear+2;y++){ const o=document.createElement("option"); o.value=y; o.textContent=y; if(y===defYear) o.selected=true; $("year").appendChild(o); }
+$("year").onchange=e=>{S.year=+e.target.value;S.picked=0;S.selDay=null;render();};
+$("len").onchange=e=>{S.len=+e.target.value;S.picked=0;render();};
+$("dow").onchange=e=>{S.dow=e.target.value;S.picked=0;render();};
+
+// Legend ramp
+[0,25,50,75,100].forEach(h=>{const i=document.createElement("i");i.style.background=`color-mix(in oklab,var(--sea) ${h}%,var(--cell))`;$("ramp").appendChild(i);});
+
+// ---------- Analysis ----------
+function analyze(people){
+  const y0=Date.UTC(S.year,0,1)/DAY, N=Date.UTC(S.year+1,0,1)/DAY-y0, L=S.len;
+  const rows=people.map(p=>{const a=new Uint8Array(N);
+    for(const r of (p.ranges||[])){ let f=toDay(r.from)-y0,t=toDay(r.to)-y0; if(isNaN(f)||isNaN(t)) continue; if(t<f)[f,t]=[t,f]; f=Math.max(0,f); t=Math.min(N-1,t); for(let i=f;i<=t;i++)a[i]=1; }
+    const pre=new Int32Array(N+1); for(let i=0;i<N;i++)pre[i+1]=pre[i]+a[i]; return {p,a,pre};});
+  const count=new Int32Array(N); for(const r of rows) for(let i=0;i<N;i++) count[i]+=r.a[i];
+  const wins=[];
+  for(let s=0;s+L<=N;s++){
+    if(S.dow!=="any" && dow(y0+s)!==+S.dow) continue;
+    let full=0,near=0,cover=0;
+    for(const r of rows){const c=r.pre[s+L]-r.pre[s]; cover+=c; if(c===L)full++; else if(c>0&&L-c<=2)near++;}
+    if(cover>0) wins.push({s,full,near,cover});
+  }
+  wins.sort((a,b)=>b.full-a.full||b.near-a.near||b.cover-a.cover||a.s-b.s);
+  const picked=[]; for(const w of wins){ if(picked.every(q=>Math.abs(q.s-w.s)>=L)) picked.push(w); if(picked.length===5)break; }
+  return {y0,N,rows,count,picked};
+}
+function split(A,w){
+  const yes=[],near=[],no=[];
+  for(const r of A.rows){const c=r.pre[w.s+S.len]-r.pre[w.s]; if(c===S.len)yes.push(r.p.name); else if(c>0&&S.len-c<=2)near.push({n:r.p.name,miss:S.len-c}); else no.push(r.p.name);}
+  const by=(a,b)=>a.localeCompare(b,"de"); yes.sort(by); near.sort((a,b)=>by(a.n,b.n)); no.sort(by);
+  return {yes,near,no};
+}
+const rangeLabel=(A,w)=>`${fmtLong.format(new Date((A.y0+w.s)*DAY))} – ${fmtLong.format(new Date((A.y0+w.s+S.len-1)*DAY))}`;
+
+// ---------- Render ----------
+function render(){
+  const people=S.demo?demoPeople():S.people;
+  const A=analyze(people);
+  const total=people.length;
+  $("pcount").textContent= total? `${total} ${total===1?"Person":"Personen"}` : "";
+  if(S.picked>=A.picked.length) S.picked=0;
+  const w=A.picked[S.picked];
+
+  // Verdict
+  const V=$("verdict");
+  if(!total){
+    V.innerHTML=`<div class="verdict"><div><div class="when">Noch keine Einträge</div><p class="muted">Sobald die ersten Leute ihre möglichen Urlaubszeiträume eingetragen haben, erscheint hier die Woche, in der die meisten können.</p>
+      <div class="actions"><a class="btn primary" href="#formsec" style="text-decoration:none">Ersten Zeitraum eintragen</a><button class="btn" type="button" id="demoOn">Beispiel ansehen</button></div></div>
+      <div class="who"><span class="eyebrow">So funktioniert's</span><p class="muted" style="margin:0">Alle tragen ein, wann sie frei nehmen könnten. Die Seite prüft jeden möglichen Starttag im Jahr und zählt, wer die ganze Dauer über kann. Wer nur ein, zwei Tage nicht kann, steht als „fast" dabei.</p></div></div>`;
+    $("alts").innerHTML="";
+    const d=$("demoOn"); if(d) d.onclick=()=>{S.demo=true;S.picked=0;render();};
+  } else if(!w){
+    V.innerHTML=`<div class="verdict"><div><div class="when">Kein passender Zeitraum in ${S.year}</div><p class="muted">Für dieses Jahr und diese Einstellung hat noch niemand Zeit eingetragen. Probier ein anderes Jahr oder einen anderen Starttag.</p></div></div>`;
+    $("alts").innerHTML="";
+  } else {
+    const sp=split(A,w), pct=Math.round(w.full/total*100);
+    const kw1=isoWeek(A.y0+w.s), kw2=isoWeek(A.y0+w.s+S.len-1);
+    V.innerHTML=`<div class="verdict"><div>
+        <span class="eyebrow">${S.picked===0?"Die meisten können":"Alternative "+(S.picked+1)}</span>
+        <div class="when">${esc(rangeLabel(A,w))}</div>
+        <span class="kw">KW ${kw1}${kw2!==kw1?"–"+kw2:""} · ${S.len} Tage</span>
+        <div class="score"><b class="mono">${w.full}</b><span>von ${total} können die ganze Zeit</span></div>
+        <div class="meter" aria-hidden="true"><i style="width:${pct}%"></i></div>
+      </div>
+      <div class="who">
+        ${sp.yes.length?`<div><div class="eyebrow">Können</div><div class="chips">${sp.yes.map(n=>`<span class="chip yes">${esc(n)}</span>`).join("")}</div></div>`:""}
+        ${sp.near.length?`<div><div class="eyebrow">Fast (fehlen nur Tage)</div><div class="chips">${sp.near.map(x=>`<span class="chip near">${esc(x.n)} <small>−${x.miss} ${x.miss===1?"Tag":"Tage"}</small></span>`).join("")}</div></div>`:""}
+        ${sp.no.length?`<div><div class="eyebrow">Können nicht</div><div class="chips">${sp.no.map(n=>`<span class="chip no">${esc(n)}</span>`).join("")}</div></div>`:""}
+      </div></div>`;
+    $("alts").innerHTML=A.picked.length>1? A.picked.map((x,i)=>`<button type="button" class="alt" data-i="${i}" aria-pressed="${i===S.picked}">
+        <span class="rank mono">${i===0?"Platz 1":"Platz "+(i+1)}</span>
+        <span class="d">${esc(fmtShort.format(new Date((A.y0+x.s)*DAY)))} – ${esc(fmtShort.format(new Date((A.y0+x.s+S.len-1)*DAY)))}</span>
+        <span class="n">${x.full}/${total} können${x.near?` · ${x.near} fast`:""}</span></button>`).join("") : "";
+    $("alts").querySelectorAll(".alt").forEach(b=>b.onclick=()=>{S.picked=+b.dataset.i;render();});
+  }
+
+  // Calendar
+  const max=Math.max(1,total);
+  const ws=w?w.s:-1, we=w?w.s+S.len-1:-2;
+  let html="";
+  for(let m=0;m<12;m++){
+    const first=Date.UTC(S.year,m,1)/DAY-A.y0, last=Date.UTC(S.year,m+1,1)/DAY-A.y0;
+    const lead=(dow(A.y0+first)+6)%7;
+    html+=`<div class="month"><h3>${MONTHS[m]}</h3><div class="grid7">${["Mo","Di","Mi","Do","Fr","Sa","So"].map(x=>`<span class="dh">${x}</span>`).join("")}`;
+    for(let k=0;k<lead;k++) html+="<span></span>";
+    for(let d=first;d<last;d++){
+      const c=A.count[d], h=Math.round(c/max*100);
+      const cls=["day"]; if(h>=55)cls.push("hot"); if(d>=ws&&d<=we)cls.push("inwin"); if(S.selDay===d)cls.push("sel");
+      html+=`<button type="button" class="${cls.join(" ")}" style="--h:${h}%" data-d="${d}" aria-label="${esc(fmtLong.format(new Date((A.y0+d)*DAY)))}: ${c} von ${total} frei">${d-first+1}</button>`;
+    }
+    html+="</div></div>";
+  }
+  $("months").innerHTML=html;
+  $("months").querySelectorAll(".day").forEach(b=>b.onclick=()=>{S.selDay=+b.dataset.d;render();});
+  if(S.selDay!=null && S.selDay<A.N){
+    const names=A.rows.filter(r=>r.a[S.selDay]).map(r=>r.p.name).sort((a,b)=>a.localeCompare(b,"de"));
+    $("dayinfo").innerHTML=`<strong>${esc(fmtLong.format(new Date((A.y0+S.selDay)*DAY)))}</strong> · ${names.length} von ${total} frei${names.length?": "+names.map(esc).join(", "):""}`;
+  }
+
+  // Timeline
+  const T=$("timeline");
+  if(!total){ T.innerHTML=`<div class="empty">Hier erscheint für jede Person ein Balken mit ihren freien Zeiträumen.</div>`; }
+  else{
+    const rows=[...A.rows].sort((a,b)=>a.p.name.localeCompare(b.p.name,"de"));
+    const band=w?`<span class="band" style="left:${ws/A.N*100}%;width:${S.len/A.N*100}%"></span>`:"";
+    let t=`<div class="tlrow tlhead"><span></span><div class="ticks">${MONTHS.map(x=>`<span>${x.slice(0,3)}</span>`).join("")}</div><span style="width:62px"></span></div>`;
+    for(const r of rows){
+      let bars="", start=-1;
+      for(let i=0;i<=A.N;i++){ const on=i<A.N&&r.a[i]; if(on&&start<0)start=i; if(!on&&start>=0){bars+=`<span class="bar" style="left:${start/A.N*100}%;width:${(i-start)/A.N*100}%"></span>`;start=-1;} }
+      const mine=!S.demo && r.p._id===S.myId;
+      t+=`<div class="tlrow"><span class="tlname" title="${esc(r.p.name)}">${esc(r.p.name)}${mine?' <span class="muted" style="font-weight:400">(du)</span>':""}</span>
+        <div class="track" role="img" aria-label="Freie Zeiträume von ${esc(r.p.name)}">${band}${bars}</div>
+        ${!S.demo&&S.online?`<button type="button" class="icon-btn" data-id="${esc(r.p._id)}">Ändern</button>`:`<span style="width:62px"></span>`}</div>`;
+    }
+    T.innerHTML=t;
+    T.querySelectorAll(".icon-btn").forEach(b=>b.onclick=()=>{startEdit(b.dataset.id);$("formsec").scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});});
+  }
+  renderStatus();
+}
+
+function renderStatus(){
+  const el=$("status"); let txt="", kind="";
+  if(S.demo){ txt=`Beispieldaten: erfundene Personen, damit du siehst, wie es aussieht. Nichts davon ist gespeichert. <button type="button" class="btn" id="demoOff" style="margin-left:8px;padding:4px 10px">Beispiel ausblenden</button>`; kind="demo"; }
+  else if(!SUPABASE_URL||!SUPABASE_KEY) txt="Noch nicht verbunden: In der Datei fehlen Supabase-Adresse und Schlüssel. Bis dahin funktioniert nur das Beispiel.";
+  else if(S.err) txt=S.online?"Die Einträge konnten gerade nicht aktualisiert werden. Die Seite versucht es weiter.":"Die Einträge können gerade nicht geladen werden. Bitte Internetverbindung prüfen; die Seite versucht es weiter.";
+  el.hidden=!txt; el.dataset.kind=kind; el.innerHTML=txt;
+  const off=$("demoOff"); if(off) off.onclick=()=>{S.demo=false;S.picked=0;render();};
+  const formOn=!S.demo && S.online;
+  $("form").querySelectorAll("input,button").forEach(x=>x.disabled=!formOn);
+  $("newperson").disabled=!formOn;
+}
+
+// ---------- Form ----------
+function blankRange(){ return {from:"",to:""}; }
+function startEdit(id){
+  const p=S.people.find(x=>x._id===id);
+  S.editingId=id; S.delArm=false; S.dupArm=null;
+  $("name").value=p?p.name:"";
+  S.formRanges=p&&p.ranges&&p.ranges.length? p.ranges.map(r=>({...r})) : [blankRange()];
+  $("del").hidden=!p; $("del").textContent="Eintrag löschen";
+  $("save").textContent=p?"Änderungen speichern":"Speichern";
+  $("h-form").textContent= !id ? "Zeiträume eintragen" : p ? (id===S.myId?"Deinen Eintrag ändern":`Eintrag von ${p.name} ändern`) : (id===S.myId?"Deine Zeiträume eintragen":"Weitere Person eintragen");
+  setMsg("");
+  renderRanges();
+}
+function renderRanges(){
+  const R=$("ranges"); R.innerHTML="";
+  const y=S.year;
+  S.formRanges.forEach((r,i)=>{
+    const row=document.createElement("div"); row.className="range";
+    row.innerHTML=`<label class="muted" for="from-${i}" style="font-size:.85rem">von</label><input type="date" id="from-${i}" value="${esc(r.from)}" min="${y-1}-01-01" max="${y+2}-12-31">
+      <label class="muted" for="to-${i}" style="font-size:.85rem">bis</label><input type="date" id="to-${i}" value="${esc(r.to)}" min="${y-1}-01-01" max="${y+2}-12-31">
+      ${S.formRanges.length>1?`<button type="button" class="icon-btn" aria-label="Zeitraum entfernen">Entfernen</button>`:""}`;
+    const [f,t]=row.querySelectorAll("input");
+    f.oninput=()=>{r.from=f.value; if(!r.to||r.to<r.from){ r.to=r.from; t.value=r.from; } };
+    t.oninput=()=>{r.to=t.value;};
+    const rm=row.querySelector("button"); if(rm) rm.onclick=()=>{S.formRanges.splice(i,1);renderRanges();};
+    R.appendChild(row);
+  });
+  renderStatus();
+}
+function setMsg(t,kind){ const m=$("formmsg"); m.textContent=t; m.className="msg"+(kind?" "+kind:""); }
+$("addrange").onclick=()=>{S.formRanges.push(blankRange());renderRanges(); const last=$("from-"+(S.formRanges.length-1)); if(last) last.focus();};
+$("newperson").onclick=()=>{startEdit("p_"+Math.random().toString(36).slice(2,10)+Date.now().toString(36));$("name").focus();};
+
+$("form").addEventListener("submit",async e=>{
+  e.preventDefault(); if(!S.online) return;
+  const name=$("name").value.trim().replace(/\s+/g," ");
+  if(!name){ setMsg("Bitte einen Namen eintragen.","err"); $("name").focus(); return; }
+  const ranges=[];
+  for(const r of S.formRanges){
+    if(!r.from&&!r.to) continue;
+    if(!r.from||!r.to){ setMsg("Bei jedem Zeitraum braucht es ein Von- und ein Bis-Datum.","err"); return; }
+    ranges.push(r.from<=r.to?{from:r.from,to:r.to}:{from:r.to,to:r.from});
+  }
+  if(!ranges.length){ setMsg("Bitte mindestens einen Zeitraum eintragen.","err"); return; }
+  ranges.sort((a,b)=>a.from.localeCompare(b.from));
+  const dup=S.people.find(p=>p._id!==S.editingId && p.name.toLowerCase()===name.toLowerCase());
+  if(dup && S.dupArm!==name){ S.dupArm=name; setMsg(`„${dup.name}" ist schon eingetragen. Nochmal auf Speichern tippen, um trotzdem einen zweiten Eintrag anzulegen, oder oben bei „${dup.name}" auf Ändern gehen.`,"err"); return; }
+  $("save").disabled=true; setMsg("Speichert …");
+  try{
+    await api("POST","",[{id:S.editingId,name,ranges,updated:new Date().toISOString()}],{Prefer:"resolution=merge-duplicates,return=minimal"});
+    await load();
+    S.dupArm=null; setMsg("Gespeichert.","ok"); $("del").hidden=false; $("save").textContent="Änderungen speichern";
+  }catch(err){
+    setMsg("Speichern hat nicht geklappt. Bitte Internetverbindung prüfen und noch einmal versuchen.","err");
+  }finally{ $("save").disabled=!S.online; renderStatus(); }
+});
+$("del").onclick=async()=>{
+  if(!S.delArm){ S.delArm=true; $("del").textContent="Wirklich löschen?"; return; }
+  try{ await api("DELETE","?id=eq."+encodeURIComponent(S.editingId)); await load(); setMsg("Eintrag gelöscht.","ok"); startEdit(S.myId); setMsg("Eintrag gelöscht.","ok"); }
+  catch(e){ setMsg("Löschen hat nicht geklappt.","err"); }
+};
+
+// ---------- Demo data (only shown on request, never stored) ----------
+function demoPeople(){
+  const y=S.year, d=(m,dd)=>`${y}-${String(m).padStart(2,"0")}-${String(dd).padStart(2,"0")}`;
+  const P=(name,...r)=>({name,ranges:r.map(([a,b,c,e])=>({from:d(a,b),to:d(c,e)}))});
+  return [
+    P("Beispiel A",[5,10,5,24],[7,12,8,9]),
+    P("Beispiel B",[7,1,7,31]),
+    P("Beispiel C",[6,20,7,20],[10,1,10,14]),
+    P("Beispiel D",[7,15,8,15]),
+    P("Beispiel E",[5,15,5,22],[7,17,7,26]),
+    P("Beispiel F",[8,1,8,31]),
+    P("Beispiel G",[7,10,7,24],[12,27,12,31]),
+    P("Beispiel H",[3,25,4,8],[7,18,7,29]),
+  ];
+}
+
+// ---------- Daten ----------
+async function api(method,qs,body,headers){
+  const r=await fetch(SUPABASE_URL.replace(/\/+$/,"")+"/rest/v1/"+TABLE+(qs||""),{method,
+    headers:Object.assign({apikey:SUPABASE_KEY,"Content-Type":"application/json"},headers||{}),
+    body:body?JSON.stringify(body):undefined});
+  if(!r.ok) throw new Error(r.status+" "+(await r.text()));
+  const t=await r.text(); return t?JSON.parse(t):null;
+}
+let firstLoad=true;
+async function load(){
+  try{
+    const rows=await api("GET","?select=id,name,ranges&order=name.asc");
+    S.people=(rows||[]).map(x=>({_id:String(x.id),name:String(x.name||"Ohne Namen"),ranges:Array.isArray(x.ranges)?x.ranges:[]}));
+    S.online=true; S.err=false;
+  }catch(e){ S.err=true; console.warn(e); }
+  if(firstLoad&&S.online){ firstLoad=false; startEdit(S.myId); }
+  render();
+}
+
+// ---------- Start ----------
+let myId=null; try{ myId=localStorage.getItem("urlaub-myid"); }catch(e){}
+if(!myId){ myId="p_"+Math.random().toString(36).slice(2,10)+Date.now().toString(36); try{ localStorage.setItem("urlaub-myid",myId); }catch(e){} }
+S.myId=myId;
+render(); startEdit(null);
+if(SUPABASE_URL&&SUPABASE_KEY){
+  load();
+  setInterval(()=>{ if(document.visibilityState==="visible") load(); },20000);
+  document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") load(); });
+}
+})();
+</script>
+</body>
+</html>

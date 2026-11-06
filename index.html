@@ -261,6 +261,8 @@ function render(){
   $("pcount").textContent= total? `${total} ${total===1?"Person":"Personen"}` : "";
   if(S.picked>=A.picked.length) S.picked=0;
   const w=A.picked[S.picked];
+  // Gleich viele Personen = gleicher Platz (1, 1, 3 …)
+  const ranks=A.picked.map(x=>1+A.picked.filter(q=>q.full>x.full).length);
 
   // Verdict
   const V=$("verdict");
@@ -277,7 +279,7 @@ function render(){
     const sp=split(A,w), pct=Math.round(w.full/total*100);
     const kw1=isoWeek(A.y0+w.s), kw2=isoWeek(A.y0+w.s+S.len-1);
     V.innerHTML=`<div class="verdict"><div>
-        <span class="eyebrow">${S.picked===0?"Die meisten können":"Alternative "+(S.picked+1)}</span>
+        <span class="eyebrow">${(()=>{const r=ranks[S.picked], same=ranks.filter(x=>x===r).length-1; return (r===1&&!same)?"Die meisten können":`Platz ${r}${same?` · gleichauf mit ${same} ${same===1?"weiteren Zeitraum":"weiteren Zeiträumen"}`:""}`;})()}</span>
         <div class="when">${esc(rangeLabel(A,w))}</div>
         <span class="kw">KW ${kw1}${kw2!==kw1?"–"+kw2:""} · ${S.len} Tage</span>
         <div class="score"><b class="mono">${w.full}</b><span>von ${total} können die ganze Zeit</span></div>
@@ -289,7 +291,7 @@ function render(){
         ${sp.no.length?`<div><div class="eyebrow">Können nicht</div><div class="chips">${sp.no.map(n=>`<span class="chip no">${esc(n)}</span>`).join("")}</div></div>`:""}
       </div></div>`;
     $("alts").innerHTML=A.picked.length>1? A.picked.map((x,i)=>`<button type="button" class="alt" data-i="${i}" aria-pressed="${i===S.picked}">
-        <span class="rank mono">${i===0?"Platz 1":"Platz "+(i+1)}</span>
+        <span class="rank mono">Platz ${ranks[i]}</span>
         <span class="d">${esc(fmtShort.format(new Date((A.y0+x.s)*DAY)))} – ${esc(fmtShort.format(new Date((A.y0+x.s+S.len-1)*DAY)))}</span>
         <span class="n">${x.full}/${total} können${x.near?` · ${x.near} fast`:""}</span></button>`).join("") : "";
     $("alts").querySelectorAll(".alt").forEach(b=>b.onclick=()=>{S.picked=+b.dataset.i;render();});

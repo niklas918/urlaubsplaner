@@ -101,6 +101,7 @@ section{display:flex;flex-direction:column;gap:14px}
 .track{position:relative;height:18px;background:var(--cell);border-radius:5px;overflow:hidden}
 .track .bar{position:absolute;top:0;bottom:0;background:var(--sea);border-radius:3px;min-width:2px}
 .track .band{position:absolute;z-index:1;top:-2px;bottom:-2px;background:color-mix(in oklab,var(--sun) 30%,transparent);border-left:2px solid var(--sun);border-right:2px solid var(--sun)}
+.track .off{position:absolute;inset:0;display:flex;align-items:center;padding-left:8px;font-size:.72rem;color:var(--danger);font-weight:600;white-space:nowrap;overflow:hidden}
 .ticks{display:grid;grid-template-columns:repeat(12,1fr);font-family:var(--mono);font-size:.62rem;color:var(--muted)}
 .tlhead{grid-template-columns:minmax(80px,150px) minmax(0,1fr) auto}
 .icon-btn{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:3px 9px;font-size:.8rem;cursor:pointer}
@@ -147,6 +148,7 @@ section{display:flex;flex-direction:column;gap:14px}
   </header>
 
   <div id="status" class="status" hidden></div>
+  <div id="yearnote" class="status" data-kind="demo" hidden></div>
 
   <section aria-labelledby="h-form" id="formsec">
     <div class="sechead"><h2 id="h-form">Zeiträume eintragen</h2>
@@ -209,6 +211,10 @@ function isoWeek(d){ const t=new Date(d*DAY); const day=(t.getUTCDay()+6)%7; t.s
 
 const now = new Date();
 const defYear = now.getMonth()>=9 ? now.getFullYear()+1 : now.getFullYear();
+const TODAY = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+const yearOf = iso => +String(iso).slice(0,4);
+function shiftYears(iso,n){ const y=yearOf(iso)+n, md=iso.slice(5); return y+"-"+(md==="02-29"?"02-28":md); }
+const fmtRange = r => `${fmtShort.format(new Date(toDay(r.from)*DAY))} ${yearOf(r.from)} – ${fmtShort.format(new Date(toDay(r.to)*DAY))} ${yearOf(r.to)}`;
 const S = { people:[], demo:false, year:defYear, len:7, dow:"any", picked:0, selDay:null,
   online:false, err:false, myId:null, editingId:null, formRanges:[], delArm:false, dupArm:null, timer:null };
 
@@ -289,6 +295,17 @@ function render(){
     $("alts").querySelectorAll(".alt").forEach(b=>b.onclick=()=>{S.picked=+b.dataset.i;render();});
   }
 
+  // Year problems
+  const YN=$("yearnote");
+  if(!S.demo){
+    const inPast=people.filter(p=>p.ranges.length&&p.ranges.every(r=>String(r.to)<TODAY));
+    const other=people.filter(p=>!inPast.includes(p)&&p.ranges.length&&!p.ranges.some(r=>yearOf(r.from)<=S.year&&yearOf(r.to)>=S.year));
+    const parts=[];
+    if(inPast.length) parts.push(`<strong>${inPast.map(p=>esc(p.name)).join(", ")}</strong>: ${inPast.length===1?"Die eingetragenen Zeiträume liegen":"Die eingetragenen Zeiträume liegen jeweils"} in der Vergangenheit (${[...new Set(inPast.flatMap(p=>p.ranges.map(r=>yearOf(r.from))))].join(", ")}) und zählen deshalb nicht mit. Bitte unten bei „Wer kann wann“ auf „Ändern“ tippen und das Jahr korrigieren.`);
+    if(other.length){ const ys=[...new Set(other.flatMap(p=>p.ranges.map(r=>yearOf(r.from))))].sort(); parts.push(`<strong>${other.map(p=>esc(p.name)).join(", ")}</strong> ${other.length===1?"hat":"haben"} nur Zeiträume in ${ys.join(", ")} eingetragen, oben ist aber ${S.year} ausgewählt.`); }
+    YN.hidden=!parts.length; YN.innerHTML=parts.join("<br>");
+  } else YN.hidden=true;
+
   // Calendar
   const max=Math.max(1,total);
   const ws=w?w.s:-1, we=w?w.s+S.len-1:-2;
@@ -324,7 +341,7 @@ function render(){
       for(let i=0;i<=A.N;i++){ const on=i<A.N&&r.a[i]; if(on&&start<0)start=i; if(!on&&start>=0){bars+=`<span class="bar" style="left:${start/A.N*100}%;width:${(i-start)/A.N*100}%"></span>`;start=-1;} }
       const mine=!S.demo && r.p._id===S.myId;
       t+=`<div class="tlrow"><span class="tlname" title="${esc(r.p.name)}">${esc(r.p.name)}${mine?' <span class="muted" style="font-weight:400">(du)</span>':""}</span>
-        <div class="track" role="img" aria-label="Freie Zeiträume von ${esc(r.p.name)}">${band}${bars}</div>
+        <div class="track" role="img" aria-label="Freie Zeiträume von ${esc(r.p.name)}">${band}${bars}${!bars&&r.p.ranges.length?`<span class="off">keine Zeiträume in ${S.year}, sondern ${[...new Set(r.p.ranges.map(x=>yearOf(x.from)))].join(", ")}</span>`:""}</div>
         ${!S.demo&&S.online?`<button type="button" class="icon-btn" data-id="${esc(r.p._id)}">Ändern</button>`:`<span style="width:62px"></span>`}</div>`;
     }
     T.innerHTML=t;
@@ -363,8 +380,8 @@ function renderRanges(){
   const y=S.year;
   S.formRanges.forEach((r,i)=>{
     const row=document.createElement("div"); row.className="range";
-    row.innerHTML=`<label class="muted" for="from-${i}" style="font-size:.85rem">von</label><input type="date" id="from-${i}" value="${esc(r.from)}" min="${y-1}-01-01" max="${y+2}-12-31">
-      <label class="muted" for="to-${i}" style="font-size:.85rem">bis</label><input type="date" id="to-${i}" value="${esc(r.to)}" min="${y-1}-01-01" max="${y+2}-12-31">
+    row.innerHTML=`<label class="muted" for="from-${i}" style="font-size:.85rem">von</label><input type="date" id="from-${i}" value="${esc(r.from)}" min="${TODAY}" max="${y+2}-12-31">
+      <label class="muted" for="to-${i}" style="font-size:.85rem">bis</label><input type="date" id="to-${i}" value="${esc(r.to)}" min="${TODAY}" max="${y+2}-12-31">
       ${S.formRanges.length>1?`<button type="button" class="icon-btn" aria-label="Zeitraum entfernen">Entfernen</button>`:""}`;
     const [f,t]=row.querySelectorAll("input");
     f.oninput=()=>{r.from=f.value; if(!r.to||r.to<r.from){ r.to=r.from; t.value=r.from; } };
@@ -373,6 +390,17 @@ function renderRanges(){
     R.appendChild(row);
   });
   renderStatus();
+}
+function showYearFix(past){
+  const m=$("formmsg"); m.className="msg err"; m.textContent="";
+  m.append(`${past.length===1?"Der Zeitraum":"Die Zeiträume"} ${past.map(fmtRange).join(", ")} ${past.length===1?"liegt":"liegen"} in der Vergangenheit. Wahrscheinlich ist das Jahr falsch. `);
+  const b=document.createElement("button"); b.type="button"; b.className="btn"; b.style.cssText="padding:3px 10px;margin-left:4px";
+  b.textContent="Ins nächste passende Jahr verschieben";
+  b.onclick=()=>{
+    for(const r of S.formRanges){ if(!r.from||!r.to) continue; let n=0; while(shiftYears(r.to>r.from?r.to:r.from,n)<TODAY) n++; if(n){ r.from=shiftYears(r.from,n); r.to=shiftYears(r.to,n); } }
+    renderRanges(); setMsg("Jahr angepasst. Bitte kurz prüfen und dann speichern.","ok");
+  };
+  m.append(b);
 }
 function setMsg(t,kind){ const m=$("formmsg"); m.textContent=t; m.className="msg"+(kind?" "+kind:""); }
 $("addrange").onclick=()=>{S.formRanges.push(blankRange());renderRanges(); const last=$("from-"+(S.formRanges.length-1)); if(last) last.focus();};
@@ -390,6 +418,8 @@ $("form").addEventListener("submit",async e=>{
   }
   if(!ranges.length){ setMsg("Bitte mindestens einen Zeitraum eintragen.","err"); return; }
   ranges.sort((a,b)=>a.from.localeCompare(b.from));
+  const past=ranges.filter(r=>r.to<TODAY);
+  if(past.length){ showYearFix(past); return; }
   const dup=S.people.find(p=>p._id!==S.editingId && p.name.toLowerCase()===name.toLowerCase());
   if(dup && S.dupArm!==name){ S.dupArm=name; setMsg(`„${dup.name}" ist schon eingetragen. Nochmal auf Speichern tippen, um trotzdem einen zweiten Eintrag anzulegen, oder oben bei „${dup.name}" auf Ändern gehen.`,"err"); return; }
   $("save").disabled=true; setMsg("Speichert …");

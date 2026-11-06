@@ -67,13 +67,23 @@ input[type=date]{font-family:var(--mono);font-size:.88rem}
 .chip.no{color:var(--muted)}
 .chip small{opacity:.8}
 
-.alts{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
-.alt{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;text-align:left;cursor:pointer}
-.alt:hover{border-color:var(--sea)}
-.alt[aria-pressed="true"]{border-color:var(--sun);box-shadow:0 0 0 1px var(--sun)}
-.alt .d{font-weight:600}
-.alt .n{font-family:var(--mono);font-size:.82rem;color:var(--muted)}
-.alt .rank{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+.alts{display:flex;flex-direction:column;gap:8px}
+.altrow{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.altrow.sel{border-color:var(--sun);box-shadow:0 0 0 1px var(--sun)}
+.alt{width:100%;background:none;border:0;padding:12px 14px;display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;grid-template-areas:"r d n c";gap:2px 14px;align-items:center;text-align:left;cursor:pointer;color:var(--ink)}
+.alt:hover .d{color:var(--sea)}
+.alt .rank{grid-area:r;font-family:var(--mono);font-size:.75rem;color:var(--muted);white-space:nowrap}
+.alt .d{grid-area:d;font-weight:600;min-width:0}
+.alt .n{grid-area:n;font-family:var(--mono);font-size:.82rem;color:var(--muted);white-space:nowrap}
+.alt .c{grid-area:c;color:var(--muted);font-size:.8rem;white-space:nowrap}
+@media (max-width:560px){.alt{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"r d c" ". n ."}}
+.altwho{border-top:1px dashed var(--line);padding:12px 14px 14px;display:flex;flex-direction:column;gap:10px}
+.more{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -8px 24px rgba(0,0,0,.12);
+  padding-top:14px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-height:55vh;overflow:auto}
+.sheet .in{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.sheet .top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.sheet .t{font-family:var(--display);font-weight:500;font-size:1.05rem}
 
 section{display:flex;flex-direction:column;gap:14px}
 .sechead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px}
@@ -172,7 +182,9 @@ section{display:flex;flex-direction:column;gap:14px}
   <section aria-labelledby="h-best">
     <h2 id="h-best" class="eyebrow" style="font-family:var(--body);font-size:.72rem;letter-spacing:.12em">Bester Zeitraum</h2>
     <div id="verdict"></div>
+    <div id="altshead" class="eyebrow" style="margin-top:6px" hidden>Alle Zeiträume nach Anzahl · antippen, um zu sehen, wer kann</div>
     <div id="alts" class="alts"></div>
+    <div id="more" class="more"></div>
   </section>
 
   <section aria-labelledby="h-cal">
@@ -182,6 +194,7 @@ section{display:flex;flex-direction:column;gap:14px}
     </div>
     <div id="months" class="months"></div>
     <div id="dayinfo" class="dayinfo muted">Tipp: Auf einen Tag tippen, um zu sehen, wer dann frei ist.</div>
+    <div id="sheet" class="sheet" role="dialog" aria-label="Wer an diesem Tag frei ist" hidden></div>
   </section>
 
   <section aria-labelledby="h-tl">
@@ -216,13 +229,15 @@ const yearOf = iso => +String(iso).slice(0,4);
 function shiftYears(iso,n){ const y=yearOf(iso)+n, md=iso.slice(5); return y+"-"+(md==="02-29"?"02-28":md); }
 const fmtRange = r => `${fmtShort.format(new Date(toDay(r.from)*DAY))} ${yearOf(r.from)} – ${fmtShort.format(new Date(toDay(r.to)*DAY))} ${yearOf(r.to)}`;
 const S = { people:[], demo:false, year:defYear, len:7, dow:"any", picked:0, selDay:null,
-  online:false, err:false, myId:null, editingId:null, formRanges:[], delArm:false, dupArm:null, timer:null };
+  online:false, err:false, shown:5, open:-1, myId:null, editingId:null, formRanges:[], delArm:false, dupArm:null, timer:null };
 
 // Year select
 for(let y=defYear-1;y<=defYear+2;y++){ const o=document.createElement("option"); o.value=y; o.textContent=y; if(y===defYear) o.selected=true; $("year").appendChild(o); }
-$("year").onchange=e=>{S.year=+e.target.value;S.picked=0;S.selDay=null;render();};
-$("len").onchange=e=>{S.len=+e.target.value;S.picked=0;render();};
-$("dow").onchange=e=>{S.dow=e.target.value;S.picked=0;render();};
+const resetList=()=>{S.picked=0;S.shown=5;S.open=-1;};
+$("year").onchange=e=>{S.year=+e.target.value;resetList();S.selDay=null;render();};
+$("len").onchange=e=>{S.len=+e.target.value;resetList();render();};
+$("dow").onchange=e=>{S.dow=e.target.value;resetList();render();};
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&S.selDay!=null){ S.selDay=null; render(); } });
 
 // Legend ramp
 [0,25,50,75,100].forEach(h=>{const i=document.createElement("i");i.style.background=`color-mix(in oklab,var(--sea) ${h}%,var(--cell))`;$("ramp").appendChild(i);});
@@ -242,7 +257,7 @@ function analyze(people){
     if(cover>0) wins.push({s,full,near,cover});
   }
   wins.sort((a,b)=>b.full-a.full||b.near-a.near||b.cover-a.cover||a.s-b.s);
-  const picked=[]; for(const w of wins){ if(picked.every(q=>Math.abs(q.s-w.s)>=L)) picked.push(w); if(picked.length===5)break; }
+  const picked=[]; for(const w of wins){ if(picked.every(q=>Math.abs(q.s-w.s)>=L)) picked.push(w); if(picked.length===60)break; }
   return {y0,N,rows,count,picked};
 }
 function split(A,w){
@@ -250,6 +265,11 @@ function split(A,w){
   for(const r of A.rows){const c=r.pre[w.s+S.len]-r.pre[w.s]; if(c===S.len)yes.push(r.p.name); else if(c>0&&S.len-c<=2)near.push({n:r.p.name,miss:S.len-c}); else no.push(r.p.name);}
   const by=(a,b)=>a.localeCompare(b,"de"); yes.sort(by); near.sort((a,b)=>by(a.n,b.n)); no.sort(by);
   return {yes,near,no};
+}
+function whoHTML(sp,yesL="Können",noL="Können nicht"){
+  return (sp.yes.length?`<div><div class="eyebrow">${yesL} (${sp.yes.length})</div><div class="chips">${sp.yes.map(n=>`<span class="chip yes">${esc(n)}</span>`).join("")}</div></div>`:"")
+   +(sp.near.length?`<div><div class="eyebrow">Fast, fehlen nur Tage (${sp.near.length})</div><div class="chips">${sp.near.map(x=>`<span class="chip near">${esc(x.n)} <small>−${x.miss} ${x.miss===1?"Tag":"Tage"}</small></span>`).join("")}</div></div>`:"")
+   +(sp.no.length?`<div><div class="eyebrow">${noL} (${sp.no.length})</div><div class="chips">${sp.no.map(n=>`<span class="chip no">${esc(n)}</span>`).join("")}</div></div>`:"");
 }
 const rangeLabel=(A,w)=>`${fmtLong.format(new Date((A.y0+w.s)*DAY))} – ${fmtLong.format(new Date((A.y0+w.s+S.len-1)*DAY))}`;
 
@@ -260,7 +280,7 @@ function render(){
   const total=people.length;
   $("pcount").textContent= total? `${total} ${total===1?"Person":"Personen"}` : "";
   if(S.picked>=A.picked.length) S.picked=0;
-  const w=A.picked[S.picked];
+  const best=A.picked[0], w=A.picked[S.picked];
   // Gleich viele Personen = gleicher Platz (1, 1, 3 …)
   const ranks=A.picked.map(x=>1+A.picked.filter(q=>q.full>x.full).length);
 
@@ -270,31 +290,36 @@ function render(){
     V.innerHTML=`<div class="verdict"><div><div class="when">Noch keine Einträge</div><p class="muted">Sobald die ersten Leute ihre möglichen Urlaubszeiträume eingetragen haben, erscheint hier die Woche, in der die meisten können.</p>
       <div class="actions"><a class="btn primary" href="#formsec" style="text-decoration:none">Ersten Zeitraum eintragen</a><button class="btn" type="button" id="demoOn">Beispiel ansehen</button></div></div>
       <div class="who"><span class="eyebrow">So funktioniert's</span><p class="muted" style="margin:0">Alle tragen ein, wann sie frei nehmen könnten. Die Seite prüft jeden möglichen Starttag im Jahr und zählt, wer die ganze Dauer über kann. Wer nur ein, zwei Tage nicht kann, steht als „fast" dabei.</p></div></div>`;
-    $("alts").innerHTML="";
+    $("alts").innerHTML=""; $("more").innerHTML=""; $("altshead").hidden=true;
     const d=$("demoOn"); if(d) d.onclick=()=>{S.demo=true;S.picked=0;render();};
-  } else if(!w){
+  } else if(!best){
     V.innerHTML=`<div class="verdict"><div><div class="when">Kein passender Zeitraum in ${S.year}</div><p class="muted">Für dieses Jahr und diese Einstellung hat noch niemand Zeit eingetragen. Probier ein anderes Jahr oder einen anderen Starttag.</p></div></div>`;
-    $("alts").innerHTML="";
+    $("alts").innerHTML=""; $("more").innerHTML=""; $("altshead").hidden=true;
   } else {
-    const sp=split(A,w), pct=Math.round(w.full/total*100);
-    const kw1=isoWeek(A.y0+w.s), kw2=isoWeek(A.y0+w.s+S.len-1);
+    const sp=split(A,best), pct=Math.round(best.full/total*100);
+    const kw1=isoWeek(A.y0+best.s), kw2=isoWeek(A.y0+best.s+S.len-1);
     V.innerHTML=`<div class="verdict"><div>
-        <span class="eyebrow">${(()=>{const r=ranks[S.picked], same=ranks.filter(x=>x===r).length-1; return (r===1&&!same)?"Die meisten können":`Platz ${r}${same?` · gleichauf mit ${same} ${same===1?"weiteren Zeitraum":"weiteren Zeiträumen"}`:""}`;})()}</span>
-        <div class="when">${esc(rangeLabel(A,w))}</div>
+        <span class="eyebrow">${(()=>{const r=ranks[0], same=ranks.filter(x=>x===r).length-1; return (r===1&&!same)?"Die meisten können":`Platz ${r}${same?` · gleichauf mit ${same} ${same===1?"weiteren Zeitraum":"weiteren Zeiträumen"}`:""}`;})()}</span>
+        <div class="when">${esc(rangeLabel(A,best))}</div>
         <span class="kw">KW ${kw1}${kw2!==kw1?"–"+kw2:""} · ${S.len} Tage</span>
-        <div class="score"><b class="mono">${w.full}</b><span>von ${total} können die ganze Zeit</span></div>
+        <div class="score"><b class="mono">${best.full}</b><span>von ${total} können die ganze Zeit</span></div>
         <div class="meter" aria-hidden="true"><i style="width:${pct}%"></i></div>
       </div>
-      <div class="who">
-        ${sp.yes.length?`<div><div class="eyebrow">Können</div><div class="chips">${sp.yes.map(n=>`<span class="chip yes">${esc(n)}</span>`).join("")}</div></div>`:""}
-        ${sp.near.length?`<div><div class="eyebrow">Fast (fehlen nur Tage)</div><div class="chips">${sp.near.map(x=>`<span class="chip near">${esc(x.n)} <small>−${x.miss} ${x.miss===1?"Tag":"Tage"}</small></span>`).join("")}</div></div>`:""}
-        ${sp.no.length?`<div><div class="eyebrow">Können nicht</div><div class="chips">${sp.no.map(n=>`<span class="chip no">${esc(n)}</span>`).join("")}</div></div>`:""}
-      </div></div>`;
-    $("alts").innerHTML=A.picked.length>1? A.picked.map((x,i)=>`<button type="button" class="alt" data-i="${i}" aria-pressed="${i===S.picked}">
-        <span class="rank mono">Platz ${ranks[i]}</span>
-        <span class="d">${esc(fmtShort.format(new Date((A.y0+x.s)*DAY)))} – ${esc(fmtShort.format(new Date((A.y0+x.s+S.len-1)*DAY)))}</span>
-        <span class="n">${x.full}/${total} können${x.near?` · ${x.near} fast`:""}</span></button>`).join("") : "";
-    $("alts").querySelectorAll(".alt").forEach(b=>b.onclick=()=>{S.picked=+b.dataset.i;render();});
+      <div class="who">${whoHTML(sp)}</div></div>`;
+    const vis=A.picked.slice(0,S.shown);
+    $("altshead").hidden=false;
+    $("alts").innerHTML=vis.map((x,i)=>{ const open=S.open===i;
+      return `<div class="altrow${i===S.picked?" sel":""}"><button type="button" class="alt" data-i="${i}" aria-expanded="${open}">
+        <span class="rank">Platz ${ranks[i]}</span>
+        <span class="d">${esc(rangeLabel(A,x))}</span>
+        <span class="n">${x.full}/${total} können${x.near?` · ${x.near} fast`:""}</span>
+        <span class="c" aria-hidden="true">${open?"▲ zu":"▼ wer?"}</span></button>
+        ${open?`<div class="altwho">${whoHTML(split(A,x))}</div>`:""}</div>`; }).join("");
+    $("alts").querySelectorAll(".alt").forEach(b=>b.onclick=()=>{const i=+b.dataset.i; S.picked=i; S.open=S.open===i?-1:i; render();});
+    const rest=A.picked.length-vis.length;
+    $("more").innerHTML=(rest>0?`<button type="button" class="btn" id="moreBtn">Mehr anzeigen (noch ${rest})</button>`:"")+(S.shown>5?`<button type="button" class="btn ghost" id="lessBtn">Weniger anzeigen</button>`:"");
+    const mb=$("moreBtn"); if(mb) mb.onclick=()=>{S.shown+=5;render();};
+    const lb=$("lessBtn"); if(lb) lb.onclick=()=>{S.shown=5; if(S.picked>=5){S.picked=0;S.open=-1;} render();};
   }
 
   // Year problems
@@ -325,11 +350,19 @@ function render(){
     html+="</div></div>";
   }
   $("months").innerHTML=html;
-  $("months").querySelectorAll(".day").forEach(b=>b.onclick=()=>{S.selDay=+b.dataset.d;render();});
-  if(S.selDay!=null && S.selDay<A.N){
-    const names=A.rows.filter(r=>r.a[S.selDay]).map(r=>r.p.name).sort((a,b)=>a.localeCompare(b,"de"));
-    $("dayinfo").innerHTML=`<strong>${esc(fmtLong.format(new Date((A.y0+S.selDay)*DAY)))}</strong> · ${names.length} von ${total} frei${names.length?": "+names.map(esc).join(", "):""}`;
-  }
+  $("months").querySelectorAll(".day").forEach(b=>b.onclick=()=>{const d=+b.dataset.d; S.selDay=S.selDay===d?null:d; render();});
+  const SH=$("sheet");
+  if(S.selDay!=null && S.selDay<A.N && total){
+    const by=(a,b)=>a.localeCompare(b,"de");
+    const yes=A.rows.filter(r=>r.a[S.selDay]).map(r=>r.p.name).sort(by), no=A.rows.filter(r=>!r.a[S.selDay]).map(r=>r.p.name).sort(by);
+    const label=fmtLong.format(new Date((A.y0+S.selDay)*DAY))+" "+S.year;
+    $("dayinfo").innerHTML=`<strong>${esc(label)}</strong> · ${yes.length} von ${total} frei${yes.length?": "+yes.map(esc).join(", "):""}`;
+    SH.innerHTML=`<div class="in"><div class="top"><div><div class="t">${esc(label)}</div><div class="muted">${yes.length} von ${total} frei</div></div>
+      <button type="button" class="icon-btn" id="sheetClose">Schließen</button></div>
+      ${whoHTML({yes,near:[],no},"Frei","Nicht frei")}</div>`;
+    SH.hidden=false;
+    $("sheetClose").onclick=()=>{S.selDay=null;render();};
+  } else { SH.hidden=true; SH.innerHTML=""; }
 
   // Timeline
   const T=$("timeline");

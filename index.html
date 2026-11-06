@@ -106,14 +106,19 @@ section{display:flex;flex-direction:column;gap:14px}
 
 /* Timeline */
 .tl{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
-.tlrow{display:grid;grid-template-columns:minmax(80px,150px) minmax(0,1fr) auto;align-items:center;gap:10px}
+.tlrow{display:grid;grid-template-columns:minmax(70px,140px) minmax(0,1fr) 64px;align-items:center;gap:10px}
+.tlrow .icon-btn{width:100%;padding-inline:4px}
+@media (max-width:560px){.tlrow{grid-template-columns:72px minmax(0,1fr) 58px;gap:8px}.tlname{font-size:.82rem}}
 .tlname{font-weight:600;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .track{position:relative;height:18px;background:var(--cell);border-radius:5px;overflow:hidden}
 .track .bar{position:absolute;top:0;bottom:0;background:var(--sea);border-radius:3px;min-width:2px}
 .track .band{position:absolute;z-index:1;top:-2px;bottom:-2px;background:color-mix(in oklab,var(--sun) 30%,transparent);border-left:2px solid var(--sun);border-right:2px solid var(--sun)}
 .track .off{position:absolute;inset:0;display:flex;align-items:center;padding-left:8px;font-size:.72rem;color:var(--danger);font-weight:600;white-space:nowrap;overflow:hidden}
-.ticks{display:grid;grid-template-columns:repeat(12,1fr);font-family:var(--mono);font-size:.62rem;color:var(--muted)}
-.tlhead{grid-template-columns:minmax(80px,150px) minmax(0,1fr) auto}
+.axis{position:relative;height:16px;font-size:.68rem;color:var(--muted)}
+.axis>span{position:absolute;top:0;text-align:center;white-space:nowrap;overflow:hidden}
+.axis .s{display:none}
+@media (max-width:560px){.axis .l{display:none}.axis .s{display:inline}}
+.track .mline{position:absolute;top:0;bottom:0;width:1px;background:var(--bg);opacity:.9}
 .icon-btn{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:3px 9px;font-size:.8rem;cursor:pointer}
 .icon-btn:hover{border-color:var(--sea)}
 .empty{padding:24px;text-align:center;color:var(--muted)}
@@ -190,7 +195,7 @@ section{display:flex;flex-direction:column;gap:14px}
   <section aria-labelledby="h-cal">
     <div class="sechead">
       <h2 id="h-cal">Jahreskalender</h2>
-      <div class="legend"><span>weniger frei</span><span class="ramp" id="ramp"></span><span>mehr frei</span><span class="win" aria-hidden="true"></span><span>gewählter Zeitraum</span></div>
+      <div class="legend"><span>weniger frei</span><span class="ramp" id="ramp"></span><span>mehr frei</span><span class="win" aria-hidden="true"></span><span id="winlegend">beste Zeiträume (ab 2 Personen)</span></div>
     </div>
     <div id="months" class="months"></div>
     <div id="dayinfo" class="dayinfo muted">Tipp: Auf einen Tag tippen, um zu sehen, wer dann frei ist.</div>
@@ -335,7 +340,9 @@ function render(){
 
   // Calendar
   const max=Math.max(1,total);
-  const ws=w?w.s:-1, we=w?w.s+S.len-1:-2;
+  const HL=new Uint8Array(A.N);
+  if(best && best.full>=2) for(const x of A.picked) if(x.full===best.full) for(let i=x.s;i<x.s+S.len;i++) HL[i]=1;
+  if(w && S.open>=0) for(let i=w.s;i<w.s+S.len;i++) HL[i]=1;
   let html="";
   for(let m=0;m<12;m++){
     const first=Date.UTC(S.year,m,1)/DAY-A.y0, last=Date.UTC(S.year,m+1,1)/DAY-A.y0;
@@ -344,7 +351,7 @@ function render(){
     for(let k=0;k<lead;k++) html+="<span></span>";
     for(let d=first;d<last;d++){
       const c=A.count[d], h=Math.round(c/max*100);
-      const cls=["day"]; if(h>=55)cls.push("hot"); if(d>=ws&&d<=we)cls.push("inwin"); if(S.selDay===d)cls.push("sel");
+      const cls=["day"]; if(h>=55)cls.push("hot"); if(HL[d])cls.push("inwin"); if(S.selDay===d)cls.push("sel");
       html+=`<button type="button" class="${cls.join(" ")}" style="--h:${h}%" data-d="${d}" aria-label="${esc(fmtLong.format(new Date((A.y0+d)*DAY)))}: ${c} von ${total} frei">${d-first+1}</button>`;
     }
     html+="</div></div>";
@@ -369,15 +376,21 @@ function render(){
   if(!total){ T.innerHTML=`<div class="empty">Hier erscheint für jede Person ein Balken mit ihren freien Zeiträumen.</div>`; }
   else{
     const rows=[...A.rows].sort((a,b)=>a.p.name.localeCompare(b.p.name,"de"));
-    const band=w?`<span class="band" style="left:${ws/A.N*100}%;width:${S.len/A.N*100}%"></span>`:"";
-    let t=`<div class="tlrow tlhead"><span></span><div class="ticks">${MONTHS.map(x=>`<span>${x.slice(0,3)}</span>`).join("")}</div><span style="width:62px"></span></div>`;
+    const pc=d=>d/A.N*100;
+    const mStart=MONTHS.map((_,m)=>Date.UTC(S.year,m,1)/DAY-A.y0).concat(A.N);
+    const SHORT=["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+    const axis=SHORT.map((x,m)=>`<span style="left:${pc(mStart[m])}%;width:${pc(mStart[m+1]-mStart[m])}%"><span class="l">${x}</span><span class="s">${x[0]}</span></span>`).join("");
+    const mlines=mStart.slice(1,12).map(d=>`<span class="mline" style="left:${pc(d)}%"></span>`).join("");
+    let band="", st=-1;
+    for(let i=0;i<=A.N;i++){ const on=i<A.N&&HL[i]; if(on&&st<0)st=i; if(!on&&st>=0){ band+=`<span class="band" style="left:${pc(st)}%;width:${pc(i-st)}%"></span>`; st=-1; } }
+    let t=`<div class="tlrow"><span></span><div class="axis" aria-hidden="true">${axis}</div><span></span></div>`;
     for(const r of rows){
       let bars="", start=-1;
       for(let i=0;i<=A.N;i++){ const on=i<A.N&&r.a[i]; if(on&&start<0)start=i; if(!on&&start>=0){bars+=`<span class="bar" style="left:${start/A.N*100}%;width:${(i-start)/A.N*100}%"></span>`;start=-1;} }
       const mine=!S.demo && r.p._id===S.myId;
       t+=`<div class="tlrow"><span class="tlname" title="${esc(r.p.name)}">${esc(r.p.name)}${mine?' <span class="muted" style="font-weight:400">(du)</span>':""}</span>
-        <div class="track" role="img" aria-label="Freie Zeiträume von ${esc(r.p.name)}">${band}${bars}${!bars&&r.p.ranges.length?`<span class="off">keine Zeiträume in ${S.year}, sondern ${[...new Set(r.p.ranges.map(x=>yearOf(x.from)))].join(", ")}</span>`:""}</div>
-        ${!S.demo&&S.online?`<button type="button" class="icon-btn" data-id="${esc(r.p._id)}">Ändern</button>`:`<span style="width:62px"></span>`}</div>`;
+        <div class="track" role="img" aria-label="Freie Zeiträume von ${esc(r.p.name)}">${mlines}${bars}${band}${!bars&&r.p.ranges.length?`<span class="off">keine Zeiträume in ${S.year}, sondern ${[...new Set(r.p.ranges.map(x=>yearOf(x.from)))].join(", ")}</span>`:""}</div>
+        ${!S.demo&&S.online?`<button type="button" class="icon-btn" data-id="${esc(r.p._id)}">Ändern</button>`:`<span></span>`}</div>`;
     }
     T.innerHTML=t;
     T.querySelectorAll(".icon-btn").forEach(b=>b.onclick=()=>{startEdit(b.dataset.id);$("formsec").scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});});
